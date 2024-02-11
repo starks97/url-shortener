@@ -30,5 +30,5 @@ lazy_static = "1.4.0"
 regex = "1.5.6"
 cached = "0.48.1"
 shuttle-actix-web = "0.38.0"
-shuttle-runtime = "0.38.0"
+shuttle-runtime = {version = "0.38.0", default-features = false}
 log = "0.4.14"
