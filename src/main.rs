@@ -2,18 +2,21 @@ use actix_cors::Cors;
 use actix_web::{
     http::header,
     web::{Data, ServiceConfig},
-    App, HttpServer,
 };
-use dotenv::dotenv;
+
 use shuttle_actix_web::ShuttleActixWeb;
+use shuttle_secrets::SecretStore;
+
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use redis::Client;
 mod config;
 
+mod config_secrets;
+
 pub struct AppState {
     db: Pool<Postgres>,
-    env: config::Config,
+    secrets: config_secrets::Config,
     redis_client: Client,
 }
 
@@ -26,20 +29,12 @@ mod token;
 use api::{handler::config_handler, health_route::health_checker_handler};
 
 #[shuttle_runtime::main]
-async fn main() -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
-    // Check if the logger has been initialized
-    if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "actix_web=info")
-    }
-    if !log::log_enabled!(log::Level::Info) {
-        env_logger::init();
-    }
+async fn main(
+    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
+    let config_data = config_secrets::Config::init(&secret_store);
 
-    dotenv().ok();
-
-    let config_data = config::Config::init();
-
-    let database_url = config_data.database_url.clone();
+    let database_url = config_data.database_url.to_owned();
     let pool: Pool<Postgres> = match PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
@@ -88,7 +83,7 @@ async fn main() -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clon
 
         cfg.app_data(Data::new(AppState {
             db: pool.clone(),
-            env: config_data.clone(),
+            secrets: config_data.clone(),
             redis_client: redis_client.clone(),
         }))
         .service(health_checker_handler)

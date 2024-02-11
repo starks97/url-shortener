@@ -5152,6 +5152,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "shuttle-secrets"
+version = "0.38.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bdd3d98310afeb2ccab62b42988a9d0a9ccc1472b18f9e0c478b024cc21556b"
+dependencies = [
+ "async-trait",
+ "shuttle-service",
+]
+
+[[package]]
 name = "shuttle-service"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6374,6 +6384,7 @@ dependencies = [
  "serde_json",
  "shuttle-actix-web",
  "shuttle-runtime",
+ "shuttle-secrets",
  "sqlx",
  "uuid",
  "validator",

@@ -37,15 +37,16 @@ pub async fn create_url(
         }
     };
 
-    let access_token_details =
-        match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
-            Ok(token_details) => token_details,
-            Err(e) => {
-                return HttpResponse::Forbidden().json(
-                    serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}),
-                );
-            }
-        };
+    let access_token_details = match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
+        Ok(token_details) => token_details,
+        Err(e) => {
+            return HttpResponse::Forbidden()
+                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
+        }
+    };
 
     let is_valid_user = match sqlx::query_as!(
         User,
@@ -114,15 +115,16 @@ pub async fn get_all_url_record(
         }
     };
 
-    let access_token_details =
-        match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
-            Ok(token_details) => token_details,
-            Err(e) => {
-                return HttpResponse::Forbidden().json(
-                    serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}),
-                );
-            }
-        };
+    let access_token_details = match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
+        Ok(token_details) => token_details,
+        Err(e) => {
+            return HttpResponse::Forbidden()
+                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
+        }
+    };
 
     let get_url_by_user_result = match sqlx::query!(
             r#"SELECT u.id AS user_id, u.name AS username, url.id AS url_id, url.original_url, url.short_url, url.views, url.created_at, url.updated_at
@@ -187,7 +189,10 @@ pub async fn update_url(
         }
     };
 
-    match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
+    match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
         Ok(token_details) => token_details,
         Err(e) => {
             return HttpResponse::Forbidden()
@@ -234,7 +239,10 @@ pub async fn delete_url(
         }
     };
 
-    match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
+    match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
         Ok(token_details) => token_details,
         Err(e) => {
             return HttpResponse::Forbidden()
@@ -276,7 +284,10 @@ pub async fn get_url_by_id(
         }
     };
 
-    match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
+    match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
         Ok(token_details) => token_details,
         Err(e) => {
             return HttpResponse::Forbidden()
@@ -322,7 +333,10 @@ pub async fn redirect_to_original_url(
         }
     };
 
-    match verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
+    match verify_jwt_token(
+        data.secrets.access_token_public_key.to_owned(),
+        &access_token,
+    ) {
         Ok(token_details) => token_details,
         Err(e) => {
             return HttpResponse::Forbidden()

@@ -32,3 +32,5 @@ cached = "0.48.1"
 shuttle-actix-web = "0.38.0"
 shuttle-runtime = {version = "0.38.0", default-features = false}
 log = "0.4.14"
+shuttle-secrets = "0.38"
+
