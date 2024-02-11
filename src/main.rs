@@ -1,6 +1,11 @@
 use actix_cors::Cors;
-use actix_web::{http::header, web::Data, App, HttpServer};
+use actix_web::{
+    http::header,
+    web::{Data, ServiceConfig},
+    App, HttpServer,
+};
 use dotenv::dotenv;
+use shuttle_actix_web::ShuttleActixWeb;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use redis::Client;
@@ -20,15 +25,19 @@ mod token;
 
 use api::{handler::config_handler, health_route::health_checker_handler};
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[shuttle_runtime::main]
+async fn main() -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
+    // Check if the logger has been initialized
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "actix_web=info")
     }
-    dotenv().ok();
-    env_logger::init();
+    if !log::log_enabled!(log::Level::Info) {
+        env_logger::init();
+    }
 
-    let config = config::Config::init();
+    dotenv().ok();
+
+    let config_data = config::Config::init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool: Pool<Postgres> = match PgPoolOptions::new()
@@ -55,7 +64,7 @@ async fn main() -> std::io::Result<()> {
 
     println!("Server started successfully 🚀!");
 
-    let redis_client = match Client::open(config.redis_url.to_owned()) {
+    let redis_client = match Client::open(config_data.redis_url.to_owned()) {
         Ok(client) => {
             println!("✅Connection to the redis is successful!");
             client
@@ -66,27 +75,25 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    HttpServer::new(move || {
+    let config = move |cfg: &mut ServiceConfig| {
         Cors::default()
-            .allowed_origin(&config.client_origin)
-            .allowed_origin("http://localhost:3000/")
-            .allowed_methods(vec!["GET", "POST", "PUT"])
+            .allowed_origin(&config_data.client_origin) // Set your allowed origin(s)
+            .allowed_methods(vec!["GET", "POST", "PUT", "PATCH"]) // Set allowed HTTP methods
             .allowed_headers(vec![
                 header::CONTENT_TYPE,
                 header::AUTHORIZATION,
                 header::ACCEPT,
-            ])
+            ]) // Set allowed headers
             .supports_credentials();
-        App::new()
-            .app_data(Data::new(AppState {
-                db: pool.clone(),
-                env: config.clone(),
-                redis_client: redis_client.clone(),
-            }))
-            .service(health_checker_handler)
-            .configure(config_handler)
-    })
-    .bind(("127.0.0.1", 8000))?
-    .run()
-    .await
+
+        cfg.app_data(Data::new(AppState {
+            db: pool.clone(),
+            env: config_data.clone(),
+            redis_client: redis_client.clone(),
+        }))
+        .service(health_checker_handler)
+        .configure(config_handler);
+    };
+
+    Ok(config.into())
 }
