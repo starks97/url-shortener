@@ -106,7 +106,7 @@ pub async fn get_users(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 60) as usize,
+            (data.secrets.access_token_max_age * 270) as usize,
         )
         .await;
 
@@ -119,7 +119,7 @@ pub async fn get_users(
         .set_ex(
             refresh_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.refresh_token_max_age * 60) as usize,
+            (data.secrets.refresh_token_max_age * 10080) as usize,
         )
         .await;
 
