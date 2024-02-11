@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE urls\n    SET views = views + 1\n    WHERE short_url = $1\n    RETURNING original_url",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "original_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "38949d5535e964df32b6bc753fcb93c464d17fecbb0489dbb9abf3f8fd7c0ce8"
+}
