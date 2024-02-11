@@ -39,7 +39,7 @@ async fn main() -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clon
 
     let config_data = config::Config::init();
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = config_data.database_url.clone();
     let pool: Pool<Postgres> = match PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
