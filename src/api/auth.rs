@@ -70,8 +70,8 @@ pub async fn get_users(
 
     let access_token_details = match generate_jwt_token(
         user.id,
-        data.env.access_token_max_age,
-        data.env.access_token_private_key.to_owned(),
+        data.secrets.access_token_max_age,
+        data.secrets.access_token_private_key.to_owned(),
     ) {
         Ok(token_details) => token_details,
         Err(e) => {
@@ -83,8 +83,8 @@ pub async fn get_users(
 
     let refresh_token_details = match generate_jwt_token(
         user.id,
-        data.env.refresh_token_max_age,
-        data.env.refresh_token_private_key.to_owned(),
+        data.secrets.refresh_token_max_age,
+        data.secrets.refresh_token_private_key.to_owned(),
     ) {
         Ok(token_details) => token_details,
         Err(e) => {
@@ -106,7 +106,7 @@ pub async fn get_users(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.env.access_token_max_age * 60) as usize,
+            (data.secrets.access_token_max_age * 60) as usize,
         )
         .await;
 
@@ -119,7 +119,7 @@ pub async fn get_users(
         .set_ex(
             refresh_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.env.refresh_token_max_age * 60) as usize,
+            (data.secrets.refresh_token_max_age * 60) as usize,
         )
         .await;
 
@@ -133,14 +133,17 @@ pub async fn get_users(
 
     let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
         .path("/")
-        .max_age(ActixWebDuration::new(data.env.access_token_max_age * 60, 0))
+        .max_age(ActixWebDuration::new(
+            data.secrets.access_token_max_age * 60,
+            0,
+        ))
         .http_only(true)
         .finish();
 
     let refresh_cookie = Cookie::build("refresh_token", refresh_token_details.token.unwrap())
         .path("/")
         .max_age(ActixWebDuration::new(
-            data.env.refresh_token_max_age * 60,
+            data.secrets.refresh_token_max_age * 60,
             0,
         ))
         .http_only(true)
@@ -148,7 +151,10 @@ pub async fn get_users(
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
         .path("/")
-        .max_age(ActixWebDuration::new(data.env.access_token_max_age * 60, 0))
+        .max_age(ActixWebDuration::new(
+            data.secrets.access_token_max_age * 60,
+            0,
+        ))
         .http_only(false)
         .finish();
 
@@ -239,15 +245,16 @@ async fn refresh_access_token_handler(
         }
     };
 
-    let refresh_token_details =
-        match verify_jwt_token(data.env.refresh_token_public_key.to_owned(), &refresh_token) {
-            Ok(token_details) => token_details,
-            Err(e) => {
-                return HttpResponse::Forbidden().json(
-                    serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}),
-                );
-            }
-        };
+    let refresh_token_details = match verify_jwt_token(
+        data.secrets.refresh_token_public_key.to_owned(),
+        &refresh_token,
+    ) {
+        Ok(token_details) => token_details,
+        Err(e) => {
+            return HttpResponse::Forbidden()
+                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
+        }
+    };
 
     let result = data.redis_client.get_async_connection().await;
     let mut redis_client = match result {
@@ -285,8 +292,8 @@ async fn refresh_access_token_handler(
 
     let access_token_details = match generate_jwt_token(
         user.id,
-        data.env.access_token_max_age,
-        data.env.access_token_private_key.to_owned(),
+        data.secrets.access_token_max_age,
+        data.secrets.access_token_private_key.to_owned(),
     ) {
         Ok(token_details) => token_details,
         Err(e) => {
@@ -299,7 +306,7 @@ async fn refresh_access_token_handler(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.env.access_token_max_age * 60) as usize,
+            (data.secrets.access_token_max_age * 60) as usize,
         )
         .await;
 
@@ -311,13 +318,19 @@ async fn refresh_access_token_handler(
 
     let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
         .path("/")
-        .max_age(ActixWebDuration::new(data.env.access_token_max_age * 60, 0))
+        .max_age(ActixWebDuration::new(
+            data.secrets.access_token_max_age * 60,
+            0,
+        ))
         .http_only(true)
         .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
         .path("/")
-        .max_age(ActixWebDuration::new(data.env.access_token_max_age * 60, 0))
+        .max_age(ActixWebDuration::new(
+            data.secrets.access_token_max_age * 60,
+            0,
+        ))
         .http_only(false)
         .finish();
 
@@ -343,15 +356,16 @@ async fn logout_handler(
         }
     };
 
-    let refresh_token_details =
-        match verify_jwt_token(data.env.refresh_token_public_key.to_owned(), &refresh_token) {
-            Ok(token_details) => token_details,
-            Err(e) => {
-                return HttpResponse::Forbidden().json(
-                    serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}),
-                );
-            }
-        };
+    let refresh_token_details = match verify_jwt_token(
+        data.secrets.refresh_token_public_key.to_owned(),
+        &refresh_token,
+    ) {
+        Ok(token_details) => token_details,
+        Err(e) => {
+            return HttpResponse::Forbidden()
+                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
+        }
+    };
 
     let mut redis_client = data.redis_client.get_async_connection().await.unwrap();
     let redis_result: redis::RedisResult<usize> = redis_client

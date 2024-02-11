@@ -54,7 +54,7 @@ impl FromRequest for JwtMiddleware {
         }
 
         let access_token_details = match verify_jwt_token(
-            data.env.access_token_public_key.to_owned(),
+            data.secrets.access_token_public_key.to_owned(),
             &access_token.unwrap(),
         ) {
             Ok(token_details) => token_details,
