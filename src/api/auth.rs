@@ -24,7 +24,7 @@ use redis::AsyncCommands;
 
 use crate::jwt_auth::JwtMiddleware;
 
-#[get("/auth/login")]
+#[post("/auth/login")]
 pub async fn get_users(
     body: web::Json<LoginUserSchema>,
     data: web::Data<AppState>,
