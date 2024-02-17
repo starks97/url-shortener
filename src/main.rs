@@ -74,11 +74,7 @@ async fn main(
         Cors::default()
             .allowed_origin(&config_data.client_origin) // Set your allowed origin(s)
             .allowed_methods(vec!["GET", "POST", "PUT", "PATCH"]) // Set allowed HTTP methods
-            .allowed_headers(vec![
-                header::CONTENT_TYPE,
-                header::AUTHORIZATION,
-                header::ACCEPT,
-            ]) // Set allowed headers
+            .allowed_headers(vec![header::CONTENT_TYPE, header::ACCEPT]) // Set allowed headers
             .supports_credentials();
 
         cfg.app_data(Data::new(AppState {
