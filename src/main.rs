@@ -72,7 +72,7 @@ async fn main(
 
     let config = move |cfg: &mut ServiceConfig| {
         Cors::default()
-            .allowed_origin(&config_data.client_origin) // Set your allowed origin(s)
+            .allowed_origin("*") // Set your allowed origin(s)
             .allowed_methods(vec!["GET", "POST", "PUT", "PATCH"]) // Set allowed HTTP methods
             .allowed_headers(vec![header::CONTENT_TYPE, header::ACCEPT]) // Set allowed headers
             .supports_credentials();
