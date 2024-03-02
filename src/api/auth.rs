@@ -140,14 +140,17 @@ pub async fn get_users(
         .http_only(true)
         .finish();
 
-    let refresh_cookie = Cookie::build("refresh_token", refresh_token_details.token.unwrap())
-        .path("/")
-        .max_age(ActixWebDuration::new(
-            data.secrets.refresh_token_max_age * 60,
-            0,
-        ))
-        .http_only(true)
-        .finish();
+    let refresh_cookie = Cookie::build(
+        "refresh_token",
+        refresh_token_details.token.clone().unwrap(),
+    )
+    .path("/")
+    .max_age(ActixWebDuration::new(
+        data.secrets.refresh_token_max_age * 60,
+        0,
+    ))
+    .http_only(true)
+    .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
         .path("/")
@@ -162,7 +165,7 @@ pub async fn get_users(
     .cookie(access_cookie)
     .cookie(refresh_cookie)
     .cookie(logged_in_cookie)
-    .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()}))
+    .json(serde_json::json!({"status": "success", "data": {"access_token": access_token_details.token.unwrap(), "refresh_token": refresh_token_details.token.unwrap()}}))
 }
 
 #[post("/auth/register")]
