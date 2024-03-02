@@ -6,7 +6,6 @@ use shuttle_secrets::SecretStore;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use redis::Client;
-mod config;
 
 mod config_secrets;
 
@@ -17,7 +16,6 @@ pub struct AppState {
 }
 
 mod api;
-mod errors;
 mod jwt_auth;
 mod models;
 mod token;
@@ -73,7 +71,7 @@ async fn main(
             redis_client: redis_client.clone(),
         }))
         .service(health_checker_handler)
-        .configure(config_handler);
+        .configure(|ctx| config_handler(ctx, &config_data));
     };
 
     Ok(config.into())
