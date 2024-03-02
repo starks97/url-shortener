@@ -6367,8 +6367,6 @@ dependencies = [
  "futures",
  "jsonwebtoken 8.3.0",
  "lazy_static",
- "log",
- "rand_core",
  "redis",
  "regex",
  "serde",

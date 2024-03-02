@@ -11,8 +11,8 @@ pub struct Url {
     pub original_url: String,
     pub short_url: String,
     pub user_id: Option<Uuid>,
-    pub views: Option<i32>, // New field: views
-    #[serde(default)] // Handle deserialization when the field is missing in JSON data
+    pub views: Option<i32>,
+    #[serde(default)]
     #[serde(rename = "createdAt")]
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(rename = "updatedAt")]
