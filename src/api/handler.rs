@@ -8,15 +8,16 @@ use super::auth::{
 use super::url::{
     create_url, delete_url, get_all_url_record, get_url_by_id, redirect_to_original_url, update_url,
 };
-
-pub fn config_handler(config: &mut web::ServiceConfig) {
+use crate::config_secrets;
+pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secrets::Config) {
     let cors = Cors::default()
-        .allowed_origin("http://127.0.0.1:4325")
-        .allowed_methods(vec!["GET", "POST", "PUT", "PATCH"]) // Set allowed HTTP methods
-        .allowed_headers(vec![header::CONTENT_TYPE, header::ACCEPT]) // Set allowed headers
-        .allowed_header(header::CONTENT_TYPE) // Set allowed headers
-        .expose_headers(&[header::CONTENT_DISPOSITION])
-        .supports_credentials()
+        .allowed_origin(&config_data.client_origin)
+        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allowed_headers(vec![
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+        ])
         .max_age(3600);
 
     let scope = web::scope("/api")
