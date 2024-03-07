@@ -309,7 +309,7 @@ async fn refresh_access_token_handler(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 60) as usize,
+            (data.secrets.access_token_max_age * 270) as usize,
         )
         .await;
 
