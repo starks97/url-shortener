@@ -18,6 +18,7 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secr
             header::CONTENT_TYPE,
             header::ACCEPT,
         ])
+        .supports_credentials()
         .max_age(3600);
 
     let scope = web::scope("/api")
