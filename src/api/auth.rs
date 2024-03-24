@@ -106,7 +106,7 @@ pub async fn get_users(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 270) as usize,
+            (data.secrets.access_token_max_age * 60) as usize,
         )
         .await;
 
@@ -119,7 +119,7 @@ pub async fn get_users(
         .set_ex(
             refresh_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.refresh_token_max_age * 10080) as usize,
+            (data.secrets.refresh_token_max_age * 60) as usize,
         )
         .await;
 
@@ -309,7 +309,7 @@ async fn refresh_access_token_handler(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 270) as usize,
+            (data.secrets.access_token_max_age * 60) as usize,
         )
         .await;
 
@@ -328,18 +328,8 @@ async fn refresh_access_token_handler(
         .http_only(true)
         .finish();
 
-    let logged_in_cookie = Cookie::build("logged_in", "true")
-        .path("/")
-        .max_age(ActixWebDuration::new(
-            data.secrets.access_token_max_age * 60,
-            0,
-        ))
-        .http_only(false)
-        .finish();
-
     HttpResponse::Ok()
         .cookie(access_cookie)
-        .cookie(logged_in_cookie)
         .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()}))
 }
 
