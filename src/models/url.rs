@@ -30,9 +30,9 @@ pub struct CreateUrl {
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateUrl {
     #[validate(url)]
-    pub original_url: String,
+    pub original_url: Option<String>,
     #[validate(length(min = 5, max = 10, code = "code_str"))]
-    pub short_url: String,
+    pub short_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

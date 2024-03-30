@@ -1,4 +1,4 @@
-use actix_web::{delete, get, patch, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, patch, post, web, HttpRequest, HttpResponse, Responder};
 
 use validator::Validate;
 
@@ -200,10 +200,20 @@ pub async fn update_url(
         }
     };
 
+    let orginal_url = match &body.original_url {
+        Some(url) => Some(url.clone()),
+        None => None,
+    };
+
+    let short_url = match &body.short_url {
+        Some(short) => Some(short),
+        None => None,
+    };
+
     let update_result = sqlx::query!(
-        r#"UPDATE "urls" SET original_url = $1, short_url = $2 WHERE id = $3"#,
-        body.original_url.to_string(),
-        body.short_url.to_string(),
+        r#"UPDATE "urls" SET original_url = $1, short_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3"#,
+        orginal_url,
+        short_url,
         path.url_id.clone()
     )
     .execute(&data.db)
@@ -217,8 +227,8 @@ pub async fn update_url(
         Err(e) => {
             println!("Error updating URL: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "message": "Failed to update URL"
+                "status": "fail",
+                "message": format_args!("{:?}",e)
             }))
         }
     }
@@ -324,26 +334,6 @@ pub async fn redirect_to_original_url(
     req: HttpRequest,
     path: web::Path<UrlPathRedirect>,
 ) -> impl Responder {
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden().json(
-                serde_json::json!({"status": "fail", "message": "token not found, please login"}),
-            );
-        }
-    };
-
-    match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
     let original_url = match sqlx::query_as!(
         OriginalUrl,
         r#"UPDATE urls
@@ -355,10 +345,7 @@ pub async fn redirect_to_original_url(
     .fetch_one(&data.db)
     .await
     {
-        Ok(url) => HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
-            "data": url
-        })),
+        Ok(row) => row.original_url,
         Err(e) => {
             println!("Error fetching URL: {:?}", e);
             return HttpResponse::NotFound().json(serde_json::json!({
@@ -368,5 +355,7 @@ pub async fn redirect_to_original_url(
         }
     };
 
-    original_url
+    HttpResponse::Found()
+        .append_header((http::header::LOCATION, original_url.clone()))
+        .finish()
 }

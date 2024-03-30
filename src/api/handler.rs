@@ -17,6 +17,7 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secr
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
             header::ACCEPT,
+            header::ACCESS_CONTROL_ALLOW_ORIGIN,
         ])
         .supports_credentials()
         .max_age(3600);

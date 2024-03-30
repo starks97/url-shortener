@@ -38,7 +38,7 @@ pub fn filter_user_record(user: &User) -> UserData {
     }
 }
 
-pub struct LoginResponse {
+pub struct _login_response {
     pub status: String,
     pub message: String,
 }

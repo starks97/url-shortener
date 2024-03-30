@@ -137,7 +137,10 @@ pub async fn get_users(
             data.secrets.access_token_max_age * 60,
             0,
         ))
-        .http_only(true)
+        .http_only(false)
+        .domain("localhost")
+        .same_site(actix_web::cookie::SameSite::Lax)
+        .secure(false)
         .finish();
 
     let refresh_cookie = Cookie::build(
@@ -149,7 +152,10 @@ pub async fn get_users(
         data.secrets.refresh_token_max_age * 60,
         0,
     ))
-    .http_only(true)
+    .http_only(false)
+    .domain("localhost")
+    .secure(false)
+    .same_site(actix_web::cookie::SameSite::Lax)
     .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
@@ -162,10 +168,10 @@ pub async fn get_users(
         .finish();
 
     HttpResponse::Ok()
-    .cookie(access_cookie)
-    .cookie(refresh_cookie)
-    .cookie(logged_in_cookie)
-    .json(serde_json::json!({"status": "success", "data": {"access_token": access_token_details.token.unwrap(), "refresh_token": refresh_token_details.token.unwrap()}}))
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .cookie(logged_in_cookie)
+        .json(serde_json::json!({"status": "success", "data": access_token_details.token.unwrap()}))
 }
 
 #[post("/auth/register")]
@@ -325,7 +331,9 @@ async fn refresh_access_token_handler(
             data.secrets.access_token_max_age * 60,
             0,
         ))
-        .http_only(true)
+        .http_only(false)
+        .domain(&data.secrets.client_origin)
+        .same_site(actix_web::cookie::SameSite::Strict)
         .finish();
 
     HttpResponse::Ok()
