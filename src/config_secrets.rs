@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use shuttle_secrets::SecretStore;
+use shuttle_runtime::SecretStore;
 
 pub fn get_secret(secret_store: &SecretStore, secret_name: &str) -> String {
     secret_store

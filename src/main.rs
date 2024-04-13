@@ -1,7 +1,8 @@
 use actix_web::web::{Data, ServiceConfig};
 
 use shuttle_actix_web::ShuttleActixWeb;
-use shuttle_secrets::SecretStore;
+
+use shuttle_runtime::SecretStore;
 
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
@@ -24,9 +25,9 @@ use api::{handler::config_handler, health_route::health_checker_handler};
 
 #[shuttle_runtime::main]
 async fn main(
-    #[shuttle_secrets::Secrets] secret_store: SecretStore,
+    #[shuttle_runtime::Secrets] secrets: SecretStore,
 ) -> ShuttleActixWeb<impl FnOnce(&mut ServiceConfig) + Send + Clone + 'static> {
-    let config_data = config_secrets::Config::init(&secret_store);
+    let config_data = config_secrets::Config::init(&secrets);
 
     let database_url = config_data.database_url.to_owned();
     let pool: Pool<Postgres> = match PgPoolOptions::new()
