@@ -23,7 +23,7 @@ pub struct Url {
 pub struct CreateUrl {
     #[validate(url)]
     pub original_url: String,
-    #[validate(length(min = 5, max = 10, code = "code_str"))]
+    #[validate(length(min = 5, max = 30, code = "code_str"))]
     pub short_url: String,
 }
 
@@ -31,7 +31,7 @@ pub struct CreateUrl {
 pub struct UpdateUrl {
     #[validate(url)]
     pub original_url: Option<String>,
-    #[validate(length(min = 5, max = 10, code = "code_str"))]
+    #[validate(length(min = 5, max = 30, code = "code_str"))]
     pub short_url: Option<String>,
 }
 

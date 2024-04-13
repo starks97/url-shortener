@@ -38,38 +38,8 @@ pub fn filter_user_record(user: &User) -> UserData {
     }
 }
 
-pub struct _login_response {
-    pub status: String,
-    pub message: String,
-}
-
-#[allow(non_snake_case)]
-#[derive(Debug, Serialize)]
-pub struct FilteredUrl {
-    pub id: String,
-    pub short_url: String,
-    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct UrlData {
-    pub url: FilteredUrl,
-}
-
 #[derive(Serialize, Debug)]
 pub struct UrlResponse {
     pub status: String,
-    pub data: UrlData,
-}
-
-pub fn filter_url_record(url: &Url) -> UrlData {
-    let filtered_url = FilteredUrl {
-        id: url.id.to_string(),
-        short_url: url.short_url.to_string(),
-        created_at: Some(url.created_at.unwrap()),
-        updated_at: Some(url.created_at.unwrap()),
-    };
-
-    UrlData { url: filtered_url }
+    pub data: Url,
 }

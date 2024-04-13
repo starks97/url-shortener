@@ -1,4 +1,4 @@
-use actix_web::{delete, get, http, patch, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, patch, post, web,  HttpResponse, Responder};
 
 use validator::Validate;
 
@@ -6,19 +6,15 @@ use crate::models::url::{
     CreateUrl, OriginalUrl, UpdateUrl, Url, UrlPath, UrlPathRedirect, UrlQuery, UrlRecord,
 };
 
-use crate::models::user::User;
-
 use crate::AppState;
 
-use crate::token::token::verify_jwt_token;
-
-use super::reponse::{filter_url_record, UrlResponse};
+use crate::jwt_auth::JwtMiddleware;
 
 #[post("/url")]
 pub async fn create_url(
     body: web::Json<CreateUrl>,
     data: web::Data<AppState>,
-    req: HttpRequest,
+    auth_guard: JwtMiddleware,
 ) -> impl Responder {
     let is_valid = body.validate();
 
@@ -26,49 +22,7 @@ pub async fn create_url(
         return HttpResponse::BadRequest()
             .json(serde_json::json!({"status": "fail", "message": is_valid.unwrap_err()}));
     };
-
-    let message = "Token is invalid or session has expired";
-
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": message}));
-        }
-    };
-
-    let access_token_details = match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
-    let is_valid_user = match sqlx::query_as!(
-        User,
-        r#"
-        SELECT * FROM users WHERE id = $1
-        "#,
-        access_token_details.user_id.to_owned()
-    )
-    .fetch_optional(&data.db)
-    .await
-    {
-        Ok(Some(user)) => user.id,
-        Ok(None) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": "User not found"}));
-        }
-        Err(e) => {
-            return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
+    
     let new_url: Url = match sqlx::query_as!(
         Url,
         r#"
@@ -78,7 +32,7 @@ pub async fn create_url(
         "#,
         body.original_url.to_string(),
         body.short_url.to_string(),
-        is_valid_user.to_owned(),
+        auth_guard.user.id,
         0
     )
     .fetch_one(&data.db)
@@ -91,49 +45,26 @@ pub async fn create_url(
         }
     };
 
-    HttpResponse::Ok().json(UrlResponse {
-        status: "success".to_string(),
-        data: filter_url_record(&new_url),
-    })
+    HttpResponse::Ok().json(serde_json::json!({"status": "success", "data": new_url}))
 }
 
 #[get("/url")]
 pub async fn get_all_url_record(
     data: web::Data<AppState>,
-    req: HttpRequest,
     query: web::Query<UrlQuery>,
+    auth_guard: JwtMiddleware,
 ) -> impl Responder {
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(10);
-
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden().json(
-                serde_json::json!({"status": "fail", "message": "token not found, please login"}),
-            );
-        }
-    };
-
-    let access_token_details = match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
 
     let get_url_by_user_result = match sqlx::query!(
             r#"SELECT u.id AS user_id, u.name AS username, url.id AS url_id, url.original_url, url.short_url, url.views, url.created_at, url.updated_at
             FROM users u
             LEFT JOIN urls url ON u.id = url.user_id
             WHERE u.id = $1 LIMIT $2 OFFSET $3"#,
-            access_token_details.user_id,
-            limit, // Limit
-            offset  // Offset
+            auth_guard.user.id,
+            limit,
+            offset 
         )
         .fetch_all(&data.db)
         .await
@@ -171,36 +102,18 @@ pub async fn get_all_url_record(
 pub async fn update_url(
     data: web::Data<AppState>,
     body: web::Json<UpdateUrl>,
-    req: HttpRequest,
+    _auth_guard: JwtMiddleware,
     path: web::Path<UrlPath>,
 ) -> impl Responder {
+
     let is_valid = body.validate();
 
     if is_valid.is_err() {
         return HttpResponse::BadRequest()
             .json(serde_json::json!({"status": "fail", "message": is_valid.unwrap_err()}));
     };
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden().json(
-                serde_json::json!({"status": "fail", "message": "token not found, please login"}),
-            );
-        }
-    };
-
-    match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
-    let orginal_url = match &body.original_url {
+    
+    let original_url = match &body.original_url {
         Some(url) => Some(url.clone()),
         None => None,
     };
@@ -210,19 +123,33 @@ pub async fn update_url(
         None => None,
     };
 
-    let update_result = sqlx::query!(
-        r#"UPDATE "urls" SET original_url = $1, short_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3"#,
-        orginal_url,
-        short_url,
-        path.url_id.clone()
-    )
+    let update_result = if original_url.is_some() {
+        sqlx::query!(
+            r#"UPDATE urls SET original_url = $1 WHERE id = $2"#,
+            original_url,
+            path.url_id.clone()
+        )
+       
+    } else if short_url.is_some() {
+        sqlx::query!(
+            r#"UPDATE urls SET short_url = $1 WHERE id = $2"#,
+            short_url,
+            path.url_id.clone()
+        )
+        
+    } else {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "fail",
+            "message": "No valid fields to update"
+        }));
+    }
     .execute(&data.db)
     .await;
 
     match update_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
-            "message": "URL updated successfully"
+            "message": "updated successfully"
         })),
         Err(e) => {
             println!("Error updating URL: {:?}", e);
@@ -238,28 +165,9 @@ pub async fn update_url(
 pub async fn delete_url(
     path: web::Path<UrlPath>,
     data: web::Data<AppState>,
-    req: HttpRequest,
+    _auth_guard: JwtMiddleware,
 ) -> impl Responder {
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden().json(
-                serde_json::json!({"status": "fail", "message": "token not found, please login"}),
-            );
-        }
-    };
-
-    match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
+    
     let delete_result = sqlx::query!(r#"DELETE FROM "urls" WHERE id = $1"#, path.url_id.clone())
         .execute(&data.db)
         .await;
@@ -283,28 +191,8 @@ pub async fn delete_url(
 pub async fn get_url_by_id(
     path: web::Path<UrlPath>,
     data: web::Data<AppState>,
-    req: HttpRequest,
+    _auth_guard: JwtMiddleware,
 ) -> impl Responder {
-    let access_token = match req.cookie("access_token") {
-        Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden().json(
-                serde_json::json!({"status": "fail", "message": "token not found, please login"}),
-            );
-        }
-    };
-
-    match verify_jwt_token(
-        data.secrets.access_token_public_key.to_owned(),
-        &access_token,
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
-    };
-
     let url_response = match sqlx::query_as!(
         Url,
         r#"SELECT * FROM urls WHERE id = $1"#,
@@ -331,7 +219,6 @@ pub async fn get_url_by_id(
 #[get("/url/redirect/{short_url}")]
 pub async fn redirect_to_original_url(
     data: web::Data<AppState>,
-    req: HttpRequest,
     path: web::Path<UrlPathRedirect>,
 ) -> impl Responder {
     let original_url = match sqlx::query_as!(

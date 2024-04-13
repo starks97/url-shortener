@@ -10,4 +10,3 @@ CREATE TABLE IF NOT EXISTS urls (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
