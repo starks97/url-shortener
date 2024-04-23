@@ -12,7 +12,7 @@ use crate::config_secrets;
 pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secrets::Config) {
     let cors = Cors::default()
         .allowed_origin(&config_data.client_origin)
-        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
