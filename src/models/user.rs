@@ -26,9 +26,16 @@ pub struct User {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct RegisterUserSchema {
-    #[validate(length(min = 3, message = "Name must be greater than 3 chars"))]
+    #[validate(length(
+        min = 3,
+        code = "code_str",
+        message = "Name must be greater than 3 chars"
+    ))]
     pub name: String,
-    #[validate(email(message = "Invalid Email"))]
+    #[validate(email(
+        code = "code_str",
+        message = "Invalid Email, please provide a valid email."
+    ))]
     pub email: String,
     #[validate(
         custom(

@@ -17,6 +17,7 @@ pub struct AppState {
 }
 
 mod api;
+mod custom_error;
 mod jwt_auth;
 mod models;
 mod token;

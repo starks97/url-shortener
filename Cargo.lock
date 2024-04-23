@@ -6617,6 +6617,7 @@ dependencies = [
  "cargo-modules",
  "cargo-shuttle",
  "chrono",
+ "derive_more",
  "futures",
  "jsonwebtoken 8.3.0",
  "lazy_static",

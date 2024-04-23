@@ -21,17 +21,27 @@ pub struct Url {
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateUrl {
-    #[validate(url)]
+    #[validate(url(code = "code_str", message = "Invalid URL, please provide a valid URL"))]
     pub original_url: String,
-    #[validate(length(min = 5, max = 30, code = "code_str"))]
+    #[validate(length(
+        min = 5,
+        max = 30,
+        code = "code_str",
+        message = "Short URL must be between 5 and 30 characters"
+    ))]
     pub short_url: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct UpdateUrl {
-    #[validate(url)]
+    #[validate(url(code = "code_str", message = "Invalid URL, please provide a valid URL"))]
     pub original_url: Option<String>,
-    #[validate(length(min = 5, max = 30, code = "code_str"))]
+    #[validate(length(
+        min = 5,
+        max = 30,
+        code = "code_str",
+        message = "Short URL must be between 5 and 30 characters"
+    ))]
     pub short_url: Option<String>,
 }
 

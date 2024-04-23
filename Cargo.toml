@@ -26,3 +26,4 @@ regex = "1.5.6"
 shuttle-actix-web = "0.43.0"
 shuttle-runtime = {version = "0.43.0", default-features = false}
 cargo-shuttle = "0.43.0"
+derive_more = "0.99.17"
