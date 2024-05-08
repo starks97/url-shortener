@@ -10,6 +10,8 @@ use redis::Client;
 
 mod config_secrets;
 
+mod utils;
+
 pub struct AppState {
     db: Pool<Postgres>,
     secrets: config_secrets::Config,

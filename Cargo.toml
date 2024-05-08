@@ -1,3 +1,6 @@
+workspace = { members = ["extension"] }
+
+
 [package]
 #[warn(non_snake_case)]
 name = "url_shortener_api"

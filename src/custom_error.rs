@@ -3,7 +3,7 @@ use actix_web::{
     http::{header::ContentType, StatusCode},
     HttpResponse, ResponseError,
 };
-use base64::display;
+
 use derive_more::{Display, Error};
 
 use sqlx::Error as SqlxError;
