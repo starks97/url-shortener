@@ -8,23 +8,11 @@ use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
 use redis::Client;
 
-mod config_secrets;
-
-mod utils;
-
-pub struct AppState {
-    db: Pool<Postgres>,
-    secrets: config_secrets::Config,
-    redis_client: Client,
-}
-
-mod api;
-mod custom_error;
-mod jwt_auth;
-mod models;
-mod token;
-
-use api::{handler::config_handler, health_route::health_checker_handler};
+use url_shortener_api::{
+    api::{handler::config_handler, health_route::health_checker_handler},
+    app_state::AppState,
+    config_secrets,
+};
 
 #[shuttle_runtime::main]
 async fn main(

@@ -11,7 +11,7 @@ use crate::models::user::{LoginUserSchema, RegisterUserSchema, User};
 
 use super::reponse::{filter_user_record, UserResponse};
 
-use crate::AppState;
+use crate::app_state::AppState;
 
 use crate::token::token::{generate_jwt_token, verify_jwt_token};
 
@@ -242,7 +242,7 @@ async fn refresh_access_token_handler(
     req: HttpRequest,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, CustomError> {
-    let message = "could not refresh access token";
+    
 
     let refresh_token = match req.cookie("refresh_token") {
         Some(c) => c.value().to_string(),
@@ -256,7 +256,7 @@ async fn refresh_access_token_handler(
         &refresh_token,
     ) {
         Ok(token_details) => token_details,
-        Err(e) => {
+        Err(_) => {
             return Err(CustomError::HttpError(CustomHttpError::TokenNotMatch));
         }
     };

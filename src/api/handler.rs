@@ -9,7 +9,11 @@ use super::url::{
     create_url, delete_url, get_all_url_record, get_url_by_id, redirect_to_original_url, update_url,
 };
 use crate::config_secrets;
+
+use log::info;
+
 pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secrets::Config) {
+    info!("Configuring routes...");
     let cors = Cors::default()
         .allowed_origin(&config_data.client_origin)
         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])

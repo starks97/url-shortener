@@ -2,7 +2,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+use core::fmt;
+
 use validator::Validate;
+
+lazy_static::lazy_static! {
+    static ref SHORT_URL_REGEX: regex::Regex = regex::Regex::new(r"^[a-zA-Z0-9_-]{5,30}$").unwrap();
+}
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
 #[allow(non_snake_case)]
@@ -12,6 +18,8 @@ pub struct Url {
     pub short_url: String,
     pub user_id: Option<Uuid>,
     pub views: Option<i32>,
+    pub category: UrlCategory,
+    pub slug: String,
     #[serde(default)]
     #[serde(rename = "createdAt")]
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -29,7 +37,12 @@ pub struct CreateUrl {
         code = "code_str",
         message = "Short URL must be between 5 and 30 characters"
     ))]
+    #[validate(regex(
+        path = "SHORT_URL_REGEX",
+        message = "Short URL can only contain letters, numbers, underscores, and hyphens"
+    ))]
     pub short_url: String,
+    pub category: UrlCategory,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -42,11 +55,15 @@ pub struct UpdateUrl {
         code = "code_str",
         message = "Short URL must be between 5 and 30 characters"
     ))]
+    #[validate(regex(
+        path = "SHORT_URL_REGEX",
+        message = "Short URL can only contain letters, numbers, underscores, and hyphens"
+    ))]
     pub short_url: Option<String>,
+    pub category: Option<UrlCategory>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-
 pub struct UrlRecord {
     pub user_id: Uuid,
     pub username: String,
@@ -54,6 +71,8 @@ pub struct UrlRecord {
     pub views: Option<i32>,
     pub original_url: String,
     pub short_url: String,
+    pub category: UrlCategory,
+    pub slug: String,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -62,6 +81,54 @@ pub struct UrlRecord {
 pub struct UrlQuery {
     pub offset: Option<i64>,
     pub limit: Option<i64>,
+    pub category: Option<UrlCategory>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum UrlCategory {
+    All,
+    Tech,
+    News,
+    Music,
+    Sports,
+    Gaming,
+    Movies,
+    Education,
+    Science,
+}
+
+impl fmt::Display for UrlCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let category = match self {
+            UrlCategory::All => "All",
+            UrlCategory::Tech => "Tech",
+            UrlCategory::News => "News",
+            UrlCategory::Music => "Music",
+            UrlCategory::Sports => "Sports",
+            UrlCategory::Gaming => "Gaming",
+            UrlCategory::Movies => "Movies",
+            UrlCategory::Education => "Education",
+            UrlCategory::Science => "Science",
+        };
+        write!(f, "{}", category)
+    }
+}
+
+impl From<String> for UrlCategory {
+    fn from(s: String) -> UrlCategory {
+        match s.as_str() {
+            "All" => UrlCategory::All,
+            "Tech" => UrlCategory::Tech,
+            "News" => UrlCategory::News,
+            "Music" => UrlCategory::Music,
+            "Sports" => UrlCategory::Sports,
+            "Gaming" => UrlCategory::Gaming,
+            "Movies" => UrlCategory::Movies,
+            "Education" => UrlCategory::Education,
+            "Science" => UrlCategory::Science,
+            _ => UrlCategory::All,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

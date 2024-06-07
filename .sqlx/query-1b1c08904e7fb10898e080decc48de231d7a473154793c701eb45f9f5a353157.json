@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT u.id AS user_id, u.name AS username, url.id AS url_id, url.original_url, url.short_url, url.views, url.created_at, url.updated_at\n            FROM users u\n            LEFT JOIN urls url ON u.id = url.user_id\n            WHERE u.id = $1 LIMIT $2 OFFSET $3",
+  "query": "\n        SELECT u.id AS user_id, u.name AS username, url.id AS url_id, url.original_url, url.short_url, url.views, url.created_at, url.updated_at\n        FROM users u\n        LEFT JOIN urls url ON u.id = url.user_id\n        WHERE u.id = $1 AND url.category = $2\n        ORDER BY url.created_at DESC\n        LIMIT $3 OFFSET $4\n        ",
   "describe": {
     "columns": [
       {
@@ -47,6 +47,7 @@
     "parameters": {
       "Left": [
         "Uuid",
+        "Text",
         "Int8",
         "Int8"
       ]
@@ -62,5 +63,5 @@
       true
     ]
   },
-  "hash": "48df5154072a8eae188eeecc0a73765342d5b7d8c93a0a96753dc7d3e6143c5c"
+  "hash": "1b1c08904e7fb10898e080decc48de231d7a473154793c701eb45f9f5a353157"
 }
