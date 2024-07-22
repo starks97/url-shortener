@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+
 use uuid::Uuid;
+
+use sqlx::FromRow;
 
 use core::fmt;
 
 use validator::Validate;
 
 lazy_static::lazy_static! {
-    static ref SHORT_URL_REGEX: regex::Regex = regex::Regex::new(r"^[a-zA-Z0-9_-]{5,30}$").unwrap();
+    static ref SHORT_URL_REGEX: regex::Regex = regex::Regex::new(r"^[a-zA-Z0-9_ ]{5,30}$").unwrap();
 }
 
 #[derive(Debug, FromRow, Deserialize, Serialize)]
@@ -39,7 +41,7 @@ pub struct CreateUrl {
     ))]
     #[validate(regex(
         path = "SHORT_URL_REGEX",
-        message = "Short URL can only contain letters, numbers, underscores, and hyphens"
+        message = "Short URL can only contain letters, numbers, underscores"
     ))]
     pub short_url: String,
     pub category: UrlCategory,
@@ -66,7 +68,6 @@ pub struct UpdateUrl {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UrlRecord {
     pub user_id: Uuid,
-    pub username: String,
     pub url_id: Uuid,
     pub views: Option<i32>,
     pub original_url: String,
@@ -84,7 +85,7 @@ pub struct UrlQuery {
     pub category: Option<UrlCategory>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub enum UrlCategory {
     All,
     Tech,

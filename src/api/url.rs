@@ -1,20 +1,18 @@
-use actix_web::{delete, get, http, patch, post, web, HttpResponse, Responder};
+use actix_web::{delete, get, http, patch, post, web, HttpResponse};
 
 use validator::Validate;
 
 use crate::models::url::{
-    CreateUrl, OriginalUrl, UpdateUrl, Url, UrlCategory, UrlPath, UrlPathRedirect, UrlQuery, UrlRecord
+    CreateUrl, OriginalUrl, UpdateUrl, Url, UrlPath, UrlPathRedirect, UrlQuery, UrlRecord,
 };
 
 use crate::app_state::AppState;
 
 use crate::jwt_auth::JwtMiddleware;
 
-use crate::custom_error::{handle_validation_error, CustomDBError, CustomError};
+use crate::custom_error::{handle_validation_error, CustomError, CustomHttpError};
 
 use crate::utils::slugify::slugify;
-
-
 
 #[post("/url")]
 pub async fn create_url(
@@ -48,14 +46,7 @@ pub async fn create_url(
         Ok(url) => url,
         Err(e) => {
             println!("Error creating URL: {:?}", e);
-            /*return Err(CustomError::DatabaseError(
-                CustomDBError::OtherError("Something happend".to_string()),
-                ),
-            );*/
-
-            return Err(CustomError::DatabaseError(CustomDBError::OtherError(
-                e.to_string(),
-            )));
+            return Err(CustomError::DataBaseError(e));
         }
     };
 
@@ -70,61 +61,68 @@ pub async fn get_all_url_record(
     data: web::Data<AppState>,
     query: web::Query<UrlQuery>,
     auth_guard: JwtMiddleware,
-) -> impl Responder {
+) -> Result<HttpResponse, CustomError> {
     let offset = query.offset.unwrap_or(0);
+
     let limit = query.limit.unwrap_or(10);
-    let category = query.category.clone().unwrap_or(UrlCategory::All);
 
-    let get_url_by_user_result = match sqlx::query!(
-    
-        r#"
-        SELECT u.id AS user_id, u.name AS username, url.id AS url_id, url.original_url, url.short_url, url.views, url.created_at, url.updated_at
-        FROM users u
-        LEFT JOIN urls url ON u.id = url.user_id
-        WHERE u.id = $1 AND url.category = $2
-        ORDER BY url.created_at DESC
-        LIMIT $3 OFFSET $4
-        "#,
-        auth_guard.user.id,
-        category.to_string().into(),
-        limit,
-        offset
+    let records = match query.category.clone() {
+        Some(category) => {
+            sqlx::query_as!(
+                Url,
+                r#"
+                SELECT id, original_url, short_url, user_id, views, category, slug, created_at, updated_at
+                FROM urls
+                WHERE user_id = $1
+                AND (urls.category = $2 OR $2 = 'All')
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+                "#,
+                auth_guard.user.id,
+                category.to_string(),
+                limit,
+                offset
+            )
+            .fetch_all(&data.db)
+            .await
+            .map_err(|err| CustomError::DataBaseError(err))?
+        },
+        None => {
+            sqlx::query_as!(
+                Url,
+                r#"
+                SELECT id, original_url, short_url, user_id, views, category, slug, created_at, updated_at
+                FROM urls
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                "#,
+                auth_guard.user.id,
+                limit,
+                offset
+            )
+            .fetch_all(&data.db)
+            .await
+            .map_err(|err| CustomError::DataBaseError(err))?
+        }
+    };
 
-        )
-        .fetch_all(&data.db)
-        .await
-        {
-            Ok(records) => {
-                if records.is_empty() {
-                    return HttpResponse::NotFound().json(serde_json::json!({"status": "fail", "message": "No records were found"}));
-                }
+    let url_records: Vec<UrlRecord> = records
+        .into_iter()
+        .map(|record| UrlRecord {
+            user_id: auth_guard.user.id,
+            url_id: record.id,
+            original_url: record.original_url,
+            short_url: record.short_url.clone(),
+            views: record.views,
+            category: record.category.clone(),
+            slug: slugify(&record.short_url),
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+        })
+        .collect();
 
-                let mut url_records: Vec<UrlRecord> = vec![];
-
-                for record in records {
-                    //when its inside of the loop we need to clone because it was move before and exist in other variable.
-                    let short_url = record.short_url.clone(); 
-                    url_records.push(UrlRecord {
-                        user_id: record.user_id,
-                        username: record.username,
-                        url_id: record.url_id,
-                        original_url: record.original_url,
-                        short_url: record.short_url,
-                        views: record.views,
-                        category: category.clone(),
-                        slug: slugify(&short_url),
-                        created_at: record.created_at,
-                        updated_at: record.updated_at,
-                    });
-                }
-
-                HttpResponse::Ok().json(serde_json::json!({"status": "success", "data": url_records}))
-
-            }
-            Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}))
-        };
-
-    get_url_by_user_result
+    Ok(HttpResponse::Ok().json(serde_json::json!({"status": "success", "data": url_records})))
 }
 
 #[patch("/url/{url_id}")]
@@ -159,9 +157,9 @@ pub async fn update_url(
             path.url_id.clone()
         )
     } else {
-        return Err(CustomError::DatabaseError(CustomDBError::DatabaseError(
-            "No valid fields to update".to_string(),
-        )));
+        return Err(CustomError::OtherError(
+            "Something happend updating the fields".to_string(),
+        ));
     }
     .execute(&data.db)
     .await;
@@ -173,9 +171,7 @@ pub async fn update_url(
         }))),
         Err(e) => {
             println!("Error updating URL: {:?}", e);
-            Err(CustomError::DatabaseError(CustomDBError::OtherError(
-                e.to_string(),
-            )))
+            Err(CustomError::DataBaseError(e))
         }
     }
 }
@@ -185,23 +181,17 @@ pub async fn delete_url(
     path: web::Path<UrlPath>,
     data: web::Data<AppState>,
     _auth_guard: JwtMiddleware,
-) -> impl Responder {
+) -> Result<HttpResponse, CustomError> {
     let delete_result = sqlx::query!(r#"DELETE FROM "urls" WHERE id = $1"#, path.url_id.clone())
         .execute(&data.db)
         .await;
 
     match delete_result {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "URL deleted successfully"
-        })),
-        Err(e) => {
-            println!("Error deleting URL: {:?}", e);
-            HttpResponse::BadRequest().json(serde_json::json!({
-                "status": "error",
-                "message": "Failed to delete URL"
-            }))
-        }
+        }))),
+        Err(e) => Err(CustomError::DataBaseError(e)),
     }
 }
 
@@ -210,7 +200,7 @@ pub async fn get_url_by_id(
     path: web::Path<UrlPath>,
     data: web::Data<AppState>,
     _auth_guard: JwtMiddleware,
-) -> impl Responder {
+) -> Result<HttpResponse, CustomError> {
     let url_response = match sqlx::query_as!(
         Url,
         r#"SELECT * FROM urls WHERE id = $1"#,
@@ -219,16 +209,13 @@ pub async fn get_url_by_id(
     .fetch_one(&data.db)
     .await
     {
-        Ok(url) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(url) => Ok(HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "data": url
-        })),
+        }))),
         Err(e) => {
             println!("Error fetching URL: {:?}", e);
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "status": "error",
-                "message": "Failed to find the URL with the given ID"
-            }));
+            return Err(CustomError::HttpError(CustomHttpError::UrlNotFound));
         }
     };
     url_response
@@ -238,7 +225,7 @@ pub async fn get_url_by_id(
 pub async fn redirect_to_original_url(
     data: web::Data<AppState>,
     path: web::Path<UrlPathRedirect>,
-) -> impl Responder {
+) -> Result<HttpResponse, CustomError> {
     let original_url = match sqlx::query_as!(
         OriginalUrl,
         r#"UPDATE urls
@@ -253,14 +240,11 @@ pub async fn redirect_to_original_url(
         Ok(row) => row.original_url,
         Err(e) => {
             println!("Error fetching URL: {:?}", e);
-            return HttpResponse::NotFound().json(serde_json::json!({
-                "status": "error",
-                "message": "Failed to fetch URL"
-            }));
+            return Err(CustomError::DataBaseError(e));
         }
     };
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .append_header((http::header::LOCATION, original_url.clone()))
-        .finish()
+        .finish())
 }

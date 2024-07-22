@@ -24,12 +24,10 @@ use redis::AsyncCommands;
 
 use crate::jwt_auth::JwtMiddleware;
 
-use crate::custom_error::{
-    handle_validation_error, CustomDBError, CustomError, CustomHttpError, ValidationModelsErrors
-};
+use crate::custom_error::{handle_validation_error, CustomError, CustomHttpError};
 
 #[post("/auth/login")]
-pub async fn get_users(
+pub async fn login(
     body: web::Json<LoginUserSchema>,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, CustomError> {
@@ -52,12 +50,12 @@ pub async fn get_users(
                 user
             } else {
                 print!("user not found");
-                return Err(CustomError::HttpError(CustomHttpError::EmailNotFound));
+                return Err(CustomError::HttpError(CustomHttpError::UserNotFound));
             }
         }
         Err(e) => {
             print!("there is not a client with that");
-            return Err(CustomError::DatabaseError(CustomDBError::DatabaseError(e.to_string())));
+            return Err(CustomError::DataBaseError(e));
         }
     };
 
@@ -73,45 +71,35 @@ pub async fn get_users(
         ));
     }
 
-    let access_token_details = match generate_jwt_token(
+    let access_token_details = generate_jwt_token(
         user.id,
         data.secrets.access_token_max_age,
         data.secrets.access_token_private_key.to_owned(),
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            println!("something happend generating the access_token, {:?}", e);
-            return Err(CustomError::HttpError(CustomHttpError::TokenNotGenerated));
-        }
-    };
+    )
+    .map_err(|err| CustomError::OtherError(err.to_string()))?;
 
-    let refresh_token_details = match generate_jwt_token(
+    let refresh_token_details = generate_jwt_token(
         user.id,
         data.secrets.refresh_token_max_age,
         data.secrets.refresh_token_private_key.to_owned(),
-    ) {
-        Ok(token_details) => token_details,
-        Err(e) => {
-            println!("something happend generating the refresh_token, {:?}", e);
-            return Err(CustomError::HttpError(CustomHttpError::TokenNotGenerated));
-        }
-    };
+    )
+    .map_err(|err| CustomError::OtherError(err.to_string()))?;
 
-    let mut redis_client = match data.redis_client.get_async_connection().await {
-        Ok(redis_client) => redis_client,
-        Err(e) => {
-            println!("something happened to connect to redis: {:?}", e);
-            return Err(CustomError::HttpError(CustomHttpError::InternalServerError));
-        }
-    };
+    let mut redis_client = data
+        .redis_client
+        .get_async_connection()
+        .await
+        .map_err(|err| CustomError::RedisError(err))?;
 
     let access_result: redis::RedisResult<()> = redis_client
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 60) as usize,
+            (data.secrets.access_token_max_age * 600) as usize,
         )
         .await;
+
+    println!("{:?}", access_result);
 
     if let Err(e) = access_result {
         println!("something happened to access to redis: {:?}", e);
@@ -122,7 +110,7 @@ pub async fn get_users(
         .set_ex(
             refresh_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.refresh_token_max_age * 60) as usize,
+            (data.secrets.refresh_token_max_age * 600) as usize,
         )
         .await;
 
@@ -173,12 +161,12 @@ pub async fn get_users(
     .cookie(access_cookie)
     .cookie(refresh_cookie)
     .cookie(logged_in_cookie)
-  
+
     .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()})))
 }
 
 #[post("/auth/register")]
-pub async fn create_user(
+pub async fn register(
     body: web::Json<RegisterUserSchema>,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, CustomError> {
@@ -203,8 +191,7 @@ pub async fn create_user(
         }
         Err(e) => {
             println!("Error occurred while querying the database");
-            // Error occurred while querying the database
-            return Err(CustomError::DatabaseError(CustomDBError::DatabaseError(e.to_string())));
+            return Err(CustomError::DataBaseError(e));
         }
     }
 
@@ -228,27 +215,20 @@ pub async fn create_user(
             status: "success".to_string(),
             data: filter_user_record(&user),
         })),
-        Err(err) => {
-            println!("Error occurred while creating user: {:?}", err);
-            // Error occurred while creating user
-
-            return Err(CustomError::DatabaseError(CustomDBError::DatabaseError(err.to_string())));
+        Err(e) => {
+            return Err(CustomError::DataBaseError(e));
         }
     }
 }
 
 #[get("/auth/refresh")]
-async fn refresh_access_token_handler(
+async fn refresh_access_token(
     req: HttpRequest,
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, CustomError> {
-    
-
     let refresh_token = match req.cookie("refresh_token") {
         Some(c) => c.value().to_string(),
-        None => {
-            return Err(CustomError::HttpError(CustomHttpError::TokenNotProvided))
-        }
+        None => return Err(CustomError::HttpError(CustomHttpError::TokenNotProvided)),
     };
 
     let refresh_token_details = match verify_jwt_token(
@@ -265,7 +245,7 @@ async fn refresh_access_token_handler(
     let mut redis_client = match result {
         Ok(redis_client) => redis_client,
         Err(e) => {
-            return Err(CustomError::HttpError(CustomHttpError::RedisProblem));
+            return Err(CustomError::RedisError(e));
         }
     };
     let redis_result: redis::RedisResult<String> = redis_client
@@ -297,9 +277,7 @@ async fn refresh_access_token_handler(
         data.secrets.access_token_private_key.to_owned(),
     ) {
         Ok(token_details) => token_details,
-        Err(e) => {
-            return Err(CustomError::HttpError(CustomHttpError::TokenNotGenerated))
-    }
+        Err(_) => return Err(CustomError::HttpError(CustomHttpError::TokenNotGenerated)),
     };
 
     let redis_result: redis::RedisResult<()> = redis_client
@@ -344,19 +322,14 @@ async fn refresh_access_token_handler(
 }
 
 #[get("/auth/logout")]
-async fn logout_handler(
+async fn logout(
     req: HttpRequest,
     auth_guard: JwtMiddleware,
     data: web::Data<AppState>,
-) -> impl Responder {
-    let message = "Token is invalid or session has expired";
-
+) -> Result<HttpResponse, CustomError> {
     let refresh_token = match req.cookie("refresh_token") {
         Some(c) => c.value().to_string(),
-        None => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": message}));
-        }
+        None => return Err(CustomError::HttpError(CustomHttpError::TokenNotProvided)),
     };
 
     let refresh_token_details = match verify_jwt_token(
@@ -364,10 +337,7 @@ async fn logout_handler(
         &refresh_token,
     ) {
         Ok(token_details) => token_details,
-        Err(e) => {
-            return HttpResponse::Forbidden()
-                .json(serde_json::json!({"status": "fail", "message": format_args!("{:?}", e)}));
-        }
+        Err(_) => return Err(CustomError::HttpError(CustomHttpError::TokenNotMatch)),
     };
 
     let mut redis_client = data.redis_client.get_async_connection().await.unwrap();
@@ -378,37 +348,36 @@ async fn logout_handler(
         ])
         .await;
 
-    if redis_result.is_err() {
-        return HttpResponse::UnprocessableEntity().json(
-            serde_json::json!({"status": "error", "message": format_args!("{:?}", redis_result.unwrap_err())}),
-        );
+    match redis_result {
+        Ok(_) => {
+            let access_cookie = Cookie::build("access_token", "")
+                .path("/")
+                .max_age(ActixWebDuration::new(-1, 0))
+                .http_only(true)
+                .finish();
+            let refresh_cookie = Cookie::build("refresh_token", "")
+                .path("/")
+                .max_age(ActixWebDuration::new(-1, 0))
+                .http_only(true)
+                .finish();
+            let logged_in_cookie = Cookie::build("logged_in", "")
+                .path("/")
+                .max_age(ActixWebDuration::new(-1, 0))
+                .http_only(true)
+                .finish();
+
+            Ok(HttpResponse::Ok()
+                .cookie(access_cookie)
+                .cookie(refresh_cookie)
+                .cookie(logged_in_cookie)
+                .json(serde_json::json!({"status": "success"})))
+        }
+        Err(err) => Err(CustomError::RedisError(err)),
     }
-
-    let access_cookie = Cookie::build("access_token", "")
-        .path("/")
-        .max_age(ActixWebDuration::new(-1, 0))
-        .http_only(true)
-        .finish();
-    let refresh_cookie = Cookie::build("refresh_token", "")
-        .path("/")
-        .max_age(ActixWebDuration::new(-1, 0))
-        .http_only(true)
-        .finish();
-    let logged_in_cookie = Cookie::build("logged_in", "")
-        .path("/")
-        .max_age(ActixWebDuration::new(-1, 0))
-        .http_only(true)
-        .finish();
-
-    HttpResponse::Ok()
-        .cookie(access_cookie)
-        .cookie(refresh_cookie)
-        .cookie(logged_in_cookie)
-        .json(serde_json::json!({"status": "success"}))
 }
 
 #[get("/users/me")]
-async fn get_me_handler(jwt_guard: JwtMiddleware) -> impl Responder {
+async fn me(jwt_guard: JwtMiddleware) -> impl Responder {
     let json_response = serde_json::json!({
         "status":  "success",
         "data": serde_json::json!(

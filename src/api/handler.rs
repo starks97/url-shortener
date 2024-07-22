@@ -1,19 +1,16 @@
 use actix_cors::Cors;
 use actix_web::{http::header, web};
 
-use super::auth::{
-    create_user, get_me_handler, get_users, logout_handler, refresh_access_token_handler,
-};
+use super::auth::{login, logout, me, refresh_access_token, register};
 
 use super::url::{
     create_url, delete_url, get_all_url_record, get_url_by_id, redirect_to_original_url, update_url,
 };
-use crate::config_secrets;
 
-use log::info;
+use super::health_route::health_checker;
+use crate::config_env;
 
-pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secrets::Config) {
-    info!("Configuring routes...");
+pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_env::Config) {
     let cors = Cors::default()
         .allowed_origin(&config_data.client_origin)
         .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "PATCH"])
@@ -27,17 +24,18 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_secr
         .max_age(3600);
 
     let scope = web::scope("/api")
-        .service(get_users)
-        .service(create_user)
-        .service(refresh_access_token_handler)
-        .service(logout_handler)
-        .service(get_me_handler)
+        .service(health_checker)
         .service(create_url)
-        .service(get_all_url_record)
-        .service(update_url)
         .service(delete_url)
+        .service(get_all_url_record)
         .service(get_url_by_id)
         .service(redirect_to_original_url)
+        .service(update_url)
+        .service(register)
+        .service(me)
+        .service(login)
+        .service(logout)
+        .service(refresh_access_token)
         .wrap(cors);
 
     config.service(scope);

@@ -1,5 +1,5 @@
 pub mod api;
-pub mod config_secrets;
+pub mod config_env;
 pub mod custom_error;
 pub mod jwt_auth;
 pub mod models;

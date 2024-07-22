@@ -1,66 +1,64 @@
-use actix_web::{
-    error,
-    http::{header::ContentType, StatusCode},
-    HttpResponse, ResponseError,
-};
+use std::error;
 
-use derive_more::{Display, Error};
+use actix_web::http::header::ContentType;
+use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 
-use sqlx::Error as SqlxError;
+use serde_json::json;
+use thiserror::Error;
 use validator::ValidationErrors;
-#[derive(Debug)]
-pub enum CustomDBError {
-    UniqueConstraintViolation(String),
-    DatabaseError(String),
+
+use redis::RedisError as redisError;
+
+use sqlx::Error as DbError;
+
+#[derive(Debug, Error)]
+pub enum CustomError {
+    #[error("Other error: {0}")]
     OtherError(String),
+
+    #[error("Database error: {0}")]
+    DataBaseError(#[from] DbError),
+
+    #[error("Validation error: {0}")]
+    ValidationError(ValidationModelsErrors),
+
+    #[error("{0}")]
+    HttpError(#[from] CustomHttpError),
+
+    #[error("Redis error: {0}")]
+    RedisError(#[from] redisError),
 }
 
-impl From<SqlxError> for CustomDBError {
-    fn from(error: SqlxError) -> Self {
-        match error {
-            SqlxError::Database(db_error) => {
-                if let Some(code) = db_error.code() {
-                    if code == "23505" {
-                        return CustomDBError::UniqueConstraintViolation(db_error.to_string());
-                    }
-                }
-
-                CustomDBError::DatabaseError(db_error.to_string())
-            }
-            _ => CustomDBError::OtherError(error.to_string()),
+impl CustomError {
+    fn log_error(&self) {
+        match self {
+            CustomError::DataBaseError(_) => log::error!("Database error: {:?}", self),
+            CustomError::OtherError(_) => log::error!("Other error has happened: {:?}", self),
+            CustomError::ValidationError(_) => log::error!("Validation error: {:?}", self),
+            CustomError::HttpError(_) => log::error!("HTTP error: {:?}", self),
+            CustomError::RedisError(_) => log::error!("Redis error: {:?}", self),
         }
     }
 }
 
-//this form its just only when you want to handle the behave of the error and return a custom message.
-
-impl std::fmt::Display for CustomDBError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.error_response())
-    }
-}
-
-impl ResponseError for CustomDBError {
+impl ResponseError for CustomError {
     fn error_response(&self) -> HttpResponse {
+        self.log_error();
         match self {
-            CustomDBError::UniqueConstraintViolation(msg) => {
-                HttpResponse::Conflict().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("{}", msg)
-                }))
-            }
-            CustomDBError::DatabaseError(code) => {
-                HttpResponse::Conflict().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Database error: {}", code)
-                }))
-            }
-            CustomDBError::OtherError(msg) => {
-                HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Other error: {}", msg)
-                }))
-            }
+            CustomError::HttpError(http_err) => http_err.error_response(),
+            CustomError::OtherError(_) => HttpResponse::BadRequest().json(json!({
+                "status": "error",
+                "message": format!("{}", self)
+            })),
+            CustomError::DataBaseError(_) => HttpResponse::ServiceUnavailable().json(json!({
+                "status": "error",
+                "message": format!("{}", self)
+            })),
+            CustomError::ValidationError(validation_err) => validation_err.error_response(),
+            CustomError::RedisError(_) => HttpResponse::ServiceUnavailable().json(json!({
+                "status": "error",
+                "message": format!("{}", self)
+            })),
         }
     }
 }
@@ -93,71 +91,39 @@ impl ResponseError for ValidationModelsErrors {
     }
 }
 
-#[derive(Debug, Display)]
-pub enum CustomError {
-    DatabaseError(CustomDBError),
-    HttpError(CustomHttpError),
-    Validation(ValidationModelsErrors),
-}
-
-// Implementación de ResponseError para CombinedError
-impl ResponseError for CustomError {
-    fn error_response(&self) -> HttpResponse {
-        match self {
-            CustomError::DatabaseError(db_error) => db_error.error_response(),
-            CustomError::HttpError(http_error) => http_error.error_response(),
-            CustomError::Validation(validation_error) => validation_error.error_response(),
-        }
-    }
-}
-
-impl From<CustomDBError> for CustomError {
-    fn from(error: CustomDBError) -> Self {
-        CustomError::DatabaseError(error)
-    }
-}
-
-impl From<CustomHttpError> for CustomError {
-    fn from(error: CustomHttpError) -> Self {
-        CustomError::HttpError(error)
-    }
-}
-
-impl From<ValidationModelsErrors> for CustomError {
-    fn from(error: ValidationModelsErrors) -> Self {
-        CustomError::Validation(error)
-    }
-}
-
-#[derive(Debug, Display, Error)]
+#[derive(Debug, Error)]
 pub enum CustomHttpError {
-    #[display(fmt = "Internal Server Error")]
+    #[error("Internal Server Error")]
     InternalServerError,
-    #[display(fmt = "Unauthorized")]
-    _Unauthorized,
-    #[display(fmt = "The email was provided were not found, please try again.")]
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("The email provided was not found, please try again.")]
     EmailNotFound,
-    #[display(
-        fmt = "The token was provided were not found, please provide a valid token by login "
-    )]
+    #[error("The token provided was not found, please provide a valid token by logging in")]
     TokenNotProvided,
-    #[display(fmt = "Service Unavailable")]
-    _ServiceUnavailable,
-    #[display(fmt = "Credentials not correct, please check the email and password.")]
+    #[error("Service Unavailable")]
+    ServiceUnavailable,
+    #[error("Credentials not correct, please check the email and password.")]
     CredentialsNotCorrect,
-    #[display(fmt = "Token not generated, please try again.")]
+    #[error("Token not generated, please try again.")]
     TokenNotGenerated,
-    #[display(fmt = "There was a problem with the Redis connection.")]
+    #[error("There was a problem with the Redis connection.")]
     RedisProblem,
-    #[display(fmt = "The email provided already exists, please use another one.")]
+    #[error("The email provided already exists, please use another one.")]
     UserAlreadyExists,
-    #[display(fmt = "The token provided is expired or not valid, please login to get a new one.")]
+    #[error("The token provided is expired or not valid, please login to get a new one.")]
     TokenNotMatch,
-    #[display(fmt = "There was a problem to find the user in Redis, please try again.")]
+    #[error("User not found, please provide a correct user or register to have an account")]
+    UserNotFound,
+    #[error("There was a problem finding the user in Redis, please try again.")]
     UserNotInRedis,
+    #[error("Record were not found.")]
+    RecordNotFound,
+    #[error("Url not found with the given ID")]
+    UrlNotFound,
 }
 
-impl error::ResponseError for CustomHttpError {
+impl ResponseError for CustomHttpError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.status_code())
             .insert_header(ContentType::json())
@@ -170,8 +136,8 @@ impl error::ResponseError for CustomHttpError {
     fn status_code(&self) -> StatusCode {
         match *self {
             CustomHttpError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
-            CustomHttpError::_Unauthorized => StatusCode::BAD_REQUEST,
-            CustomHttpError::_ServiceUnavailable => StatusCode::CONFLICT,
+            CustomHttpError::Unauthorized => StatusCode::UNAUTHORIZED,
+            CustomHttpError::ServiceUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             CustomHttpError::EmailNotFound => StatusCode::NOT_FOUND,
             CustomHttpError::TokenNotProvided => StatusCode::FORBIDDEN,
             CustomHttpError::CredentialsNotCorrect => StatusCode::UNAUTHORIZED,
@@ -180,6 +146,9 @@ impl error::ResponseError for CustomHttpError {
             CustomHttpError::UserAlreadyExists => StatusCode::CONFLICT,
             CustomHttpError::TokenNotMatch => StatusCode::FORBIDDEN,
             CustomHttpError::UserNotInRedis => StatusCode::NOT_FOUND,
+            CustomHttpError::RecordNotFound => StatusCode::NOT_FOUND,
+            CustomHttpError::UrlNotFound => StatusCode::NOT_FOUND,
+            CustomHttpError::UserNotFound => StatusCode::NOT_FOUND,
         }
     }
 }
@@ -200,7 +169,7 @@ pub fn handle_validation_error(
         .collect::<Vec<String>>()
         .join(", ");
 
-    Err(CustomError::Validation(ValidationModelsErrors::Error(
+    Err(CustomError::ValidationError(ValidationModelsErrors::Error(
         error_message,
     )))
 }

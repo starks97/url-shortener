@@ -1,8 +1,7 @@
-use config_secrets::Config;
 use redis::Client;
 use sqlx::PgPool;
 
-use crate::config_secrets;
+use crate::config_env::Config;
 
 pub struct AppState {
     pub db: PgPool,
