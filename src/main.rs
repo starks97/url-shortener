@@ -55,7 +55,7 @@ async fn main() -> Result<(), CustomError> {
             }))
             .configure(|ctx| config_handler(ctx, &config_data))
     })
-    .bind("127.0.0.1:8060")
+    .bind("127.0.0.1:8000")
     .map_err(|err| {
         warn!("Failed to bind server: {:?}", err);
         CustomError::OtherError(err.to_string())

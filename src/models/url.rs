@@ -68,7 +68,7 @@ pub struct UpdateUrl {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UrlRecord {
     pub user_id: Uuid,
-    pub url_id: Uuid,
+    pub id: Uuid,
     pub views: Option<i32>,
     pub original_url: String,
     pub short_url: String,

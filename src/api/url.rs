@@ -111,7 +111,7 @@ pub async fn get_all_url_record(
         .into_iter()
         .map(|record| UrlRecord {
             user_id: auth_guard.user.id,
-            url_id: record.id,
+            id: record.id,
             original_url: record.original_url,
             short_url: record.short_url.clone(),
             views: record.views,
@@ -146,8 +146,9 @@ pub async fn update_url(
         )
     } else if let Some(short_url) = &body.short_url {
         sqlx::query!(
-            r#"UPDATE urls SET short_url = $1 WHERE id = $2"#,
+            r#"UPDATE urls SET short_url = $1, slug = $2 WHERE id = $3"#,
             short_url,
+            slugify(&short_url),
             path.url_id.clone()
         )
     } else if let Some(category) = &body.category {

@@ -1,5 +1,3 @@
-use std::error;
-
 use actix_web::http::header::ContentType;
 use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 
