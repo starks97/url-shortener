@@ -95,11 +95,9 @@ pub async fn login(
         .set_ex(
             access_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.access_token_max_age * 600) as usize,
+            (data.secrets.access_token_max_age * 60) as usize,
         )
         .await;
-
-    println!("{:?}", access_result);
 
     if let Err(e) = access_result {
         println!("something happened to access to redis: {:?}", e);
@@ -110,7 +108,7 @@ pub async fn login(
         .set_ex(
             refresh_token_details.token_uuid.to_string(),
             user.id.to_string(),
-            (data.secrets.refresh_token_max_age * 600) as usize,
+            (data.secrets.refresh_token_max_age * 60) as usize,
         )
         .await;
 
@@ -121,12 +119,11 @@ pub async fn login(
 
     let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
         .path("/")
-        .max_age(ActixWebDuration::new(
+        .max_age(ActixWebDuration::seconds(
             data.secrets.access_token_max_age * 60,
-            0,
         ))
         .http_only(true)
-        .domain("localhost")
+        .domain(data.secrets.domain.clone())
         .same_site(actix_web::cookie::SameSite::Lax)
         .secure(true)
         .finish();
@@ -136,24 +133,22 @@ pub async fn login(
         refresh_token_details.token.clone().unwrap(),
     )
     .path("/")
-    .max_age(ActixWebDuration::new(
+    .max_age(ActixWebDuration::seconds(
         data.secrets.refresh_token_max_age * 60,
-        0,
     ))
     .http_only(true)
-    .domain("localhost")
+    .domain(data.secrets.domain.clone())
     .secure(true)
     .same_site(actix_web::cookie::SameSite::Lax)
     .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
         .path("/")
-        .max_age(ActixWebDuration::new(
+        .max_age(ActixWebDuration::seconds(
             data.secrets.access_token_max_age * 60,
-            0,
         ))
         .http_only(false)
-        .domain("localhost")
+        .domain(data.secrets.domain.clone())
         .secure(true)
         .finish();
 

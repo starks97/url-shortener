@@ -1,15 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE urls SET short_url = $1 WHERE id = $2",
+  "query": "UPDATE urls SET short_url = $1, slug = $2 WHERE id = $3",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
+        "Varchar",
         "Varchar",
         "Uuid"
       ]
     },
     "nullable": []
   },
-  "hash": "5e1cc12e64dcb573aff287d83ff0d30abecca58d829c61d015d4a2e1a79a78ce"
+  "hash": "9d964754b41d601e58e7926ebd1a3e3cd678f358b0c8a5c38cd7521e77d76e46"
 }

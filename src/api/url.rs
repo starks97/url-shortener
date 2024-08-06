@@ -62,9 +62,8 @@ pub async fn get_all_url_record(
     query: web::Query<UrlQuery>,
     auth_guard: JwtMiddleware,
 ) -> Result<HttpResponse, CustomError> {
+    let limit = query.limit.unwrap_or(5);
     let offset = query.offset.unwrap_or(0);
-
-    let limit = query.limit.unwrap_or(10);
 
     let records = match query.category.clone() {
         Some(category) => {

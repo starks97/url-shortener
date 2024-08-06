@@ -20,6 +20,7 @@ pub struct Config {
     pub database_url: String,
     pub redis_url: String,
     pub client_origin: String,
+    pub domain: String,
     pub access_token_private_key: String,
     pub access_token_public_key: String,
     pub access_token_expires_in: String,
@@ -38,6 +39,7 @@ impl Config {
         let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set in .env file");
         let client_origin =
             env::var("CLIENT_ORIGIN").expect("CLIENT_ORIGIN must be set in .env file");
+        let domain = env::var("DOMAIN").expect("DOMAIN must be set in .env file");
         let access_token_private_key = env::var("ACCESS_TOKEN_PRIVATE_KEY")
             .expect("ACCESS_TOKEN_PRIVATE_KEY must be set in .env file");
         let access_token_public_key = env::var("ACCESS_TOKEN_PUBLIC_KEY")
@@ -59,6 +61,7 @@ impl Config {
             database_url,
             redis_url,
             client_origin,
+            domain,
             access_token_private_key,
             access_token_public_key,
             access_token_expires_in,
