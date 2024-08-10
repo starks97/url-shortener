@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{http::header, web};
 
-use super::auth::{login, logout, me, refresh_access_token, register};
+use super::auth::{login, logout, me, refresh_access_token, register, session_status};
 
 use super::url::{
     create_url, delete_url, get_all_url_record, get_url_by_id, redirect_to_original_url, update_url,
@@ -36,6 +36,7 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_env:
         .service(login)
         .service(logout)
         .service(refresh_access_token)
+        .service(session_status)
         .wrap(cors);
 
     config.service(scope);

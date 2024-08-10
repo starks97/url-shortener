@@ -149,15 +149,14 @@ pub async fn login(
         ))
         .http_only(false)
         .domain(data.secrets.domain.clone())
-        .secure(true)
+        .secure(false)
         .finish();
 
     Ok(HttpResponse::Ok()
-    .cookie(access_cookie)
-    .cookie(refresh_cookie)
-    .cookie(logged_in_cookie)
-
-    .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()})))
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .cookie(logged_in_cookie)
+        .json(serde_json::json!({"status": "success"})))
 }
 
 #[post("/auth/register")]
@@ -369,6 +368,32 @@ async fn logout(
         }
         Err(err) => Err(CustomError::RedisError(err)),
     }
+}
+
+#[get("/session_status")]
+async fn session_status(
+    req: HttpRequest,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, CustomError> {
+    let refresh_token = req.cookie("refresh_token").map(|c| c.value().to_string());
+
+    let access_token = req.cookie("access_token").map(|c| c.value().to_string());
+
+    if let Some(token) = access_token {
+        match verify_jwt_token(data.secrets.access_token_public_key.clone(), &token) {
+            Ok(_) => return Ok(HttpResponse::Ok().json("valid")),
+            Err(_) => {}
+        }
+    }
+
+    if let Some(refresh) = refresh_token {
+        match verify_jwt_token(data.secrets.refresh_token_public_key.clone(), &refresh) {
+            Ok(_) => return Ok(HttpResponse::Ok().json("refresh")),
+            Err(_) => {}
+        }
+    }
+
+    Ok(HttpResponse::Unauthorized().json("login"))
 }
 
 #[get("/users/me")]
