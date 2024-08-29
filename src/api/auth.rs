@@ -125,7 +125,7 @@ pub async fn login(
         ))
         .http_only(true)
         .domain(data.secrets.domain.clone())
-        .same_site(actix_web::cookie::SameSite::Lax)
+        .same_site(actix_web::cookie::SameSite::None)
         .secure(true)
         .finish();
 
@@ -140,7 +140,7 @@ pub async fn login(
     .http_only(true)
     .domain(data.secrets.domain.clone())
     .secure(true)
-    .same_site(actix_web::cookie::SameSite::Lax)
+    .same_site(actix_web::cookie::SameSite::None)
     .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
@@ -295,7 +295,7 @@ async fn refresh_access_token(
         ))
         .http_only(true)
         .domain("localhost")
-        .same_site(actix_web::cookie::SameSite::Lax)
+        .same_site(actix_web::cookie::SameSite::None)
         .secure(true)
         .finish();
 
