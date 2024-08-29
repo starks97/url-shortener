@@ -3,6 +3,7 @@ use actix_web::{
     cookie::{time::Duration as ActixWebDuration, Cookie},
     get, post, web, HttpResponse, Responder,
 };
+use serde_json::json;
 use uuid::Uuid;
 
 use validator::Validate;
@@ -381,19 +382,19 @@ async fn session_status(
 
     if let Some(token) = access_token {
         match verify_jwt_token(data.secrets.access_token_public_key.clone(), &token) {
-            Ok(_) => return Ok(HttpResponse::Ok().json("valid")),
+            Ok(_) => return Ok(HttpResponse::Ok().json(json!({"status": "access"}))),
             Err(_) => {}
         }
     }
 
     if let Some(refresh) = refresh_token {
         match verify_jwt_token(data.secrets.refresh_token_public_key.clone(), &refresh) {
-            Ok(_) => return Ok(HttpResponse::Ok().json("refresh")),
+            Ok(_) => return Ok(HttpResponse::Ok().json(json!({"status": "refresh"}))),
             Err(_) => {}
         }
     }
 
-    Ok(HttpResponse::Unauthorized().json("login"))
+    Ok(HttpResponse::Unauthorized().json(json!({"status": "login"})))
 }
 
 #[get("/users/me")]
