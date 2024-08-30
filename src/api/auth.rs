@@ -294,7 +294,7 @@ async fn refresh_access_token(
             0,
         ))
         .http_only(true)
-        .domain("localhost")
+        .domain(data.secrets.domain.clone())
         .same_site(actix_web::cookie::SameSite::None)
         .secure(true)
         .finish();
@@ -306,7 +306,7 @@ async fn refresh_access_token(
             0,
         ))
         .http_only(false)
-        .domain("localhost")
+        .domain(data.secrets.domain.clone())
         .secure(true)
         .finish();
 
