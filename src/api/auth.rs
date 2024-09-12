@@ -377,24 +377,21 @@ async fn session_status(
     data: web::Data<AppState>,
 ) -> Result<HttpResponse, CustomError> {
     let refresh_token = req.cookie("refresh_token").map(|c| c.value().to_string());
-
     let access_token = req.cookie("access_token").map(|c| c.value().to_string());
 
     if let Some(token) = access_token {
-        match verify_jwt_token(data.secrets.access_token_public_key.clone(), &token) {
-            Ok(_) => return Ok(HttpResponse::Ok().json(json!({"status": "access"}))),
-            Err(_) => {}
+        if verify_jwt_token(data.secrets.access_token_public_key.clone(), &token).is_ok() {
+            return Ok(HttpResponse::Ok().json(json!({ "status": "access" })));
         }
     }
 
     if let Some(refresh) = refresh_token {
-        match verify_jwt_token(data.secrets.refresh_token_public_key.clone(), &refresh) {
-            Ok(_) => return Ok(HttpResponse::Ok().json(json!({"status": "refresh"}))),
-            Err(_) => {}
+        if verify_jwt_token(data.secrets.refresh_token_public_key.clone(), &refresh).is_ok() {
+            return Ok(HttpResponse::Ok().json(json!({ "status": "refresh" })));
         }
     }
 
-    Ok(HttpResponse::Unauthorized().json(json!({"status": "login"})))
+    Ok(HttpResponse::Unauthorized().json(json!({ "status": "login" })))
 }
 
 #[get("/users/me")]
