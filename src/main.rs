@@ -20,7 +20,7 @@ async fn main() -> Result<(), CustomError> {
 
     let database_url = config_data.database_url.to_owned();
     let pool: Pool<Postgres> = PgPoolOptions::new()
-        .max_connections(1)
+        .max_connections(5)
         .connect(&database_url)
         .await
         .map_err(|err| {
