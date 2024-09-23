@@ -126,7 +126,8 @@ pub async fn login(
         .http_only(true)
         .domain(data.secrets.domain.clone())
         .same_site(actix_web::cookie::SameSite::None)
-        .secure(true)
+        //just use secure in production
+        .secure(cfg!(not(debug_assertions)))
         .finish();
 
     let refresh_cookie = Cookie::build(
@@ -139,7 +140,7 @@ pub async fn login(
     ))
     .http_only(true)
     .domain(data.secrets.domain.clone())
-    .secure(true)
+    .secure(cfg!(not(debug_assertions)))
     .same_site(actix_web::cookie::SameSite::None)
     .finish();
 
@@ -296,7 +297,7 @@ async fn refresh_access_token(
         .http_only(true)
         .domain(data.secrets.domain.clone())
         .same_site(actix_web::cookie::SameSite::None)
-        .secure(true)
+        .secure(cfg!(not(debug_assertions)))
         .finish();
 
     let logged_in_cookie = Cookie::build("logged_in", "true")
@@ -307,7 +308,7 @@ async fn refresh_access_token(
         ))
         .http_only(false)
         .domain(data.secrets.domain.clone())
-        .secure(true)
+        .secure(cfg!(not(debug_assertions)))
         .finish();
 
     Ok(HttpResponse::Ok()
