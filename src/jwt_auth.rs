@@ -36,16 +36,19 @@ impl FromRequest for JwtMiddleware {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let data = req.app_data::<web::Data<AppState>>().unwrap();
 
-        let access_token = req
-            .cookie("access_token")
-            .map(|c| c.value().to_string())
-            .or_else(|| {
-                req.headers()
-                    .get(http::header::AUTHORIZATION)
-                    .map(|h| h.to_str().unwrap().split_at(7).1.to_string())
+        let bearer_token = req
+            .headers()
+            .get(http::header::AUTHORIZATION)
+            .and_then(|auth_header| auth_header.to_str().ok())
+            .and_then(|auth_str| {
+                if auth_str.starts_with("Bearer") {
+                    Some(auth_str[7..].to_string())
+                } else {
+                    None
+                }
             });
 
-        if access_token.is_none() {
+        if bearer_token.is_none() {
             let json_error = serde_json::json!(ErrorResponse {
                 status: "fail".to_string(),
                 message: "You are not logged in, please provide token".to_string(),
@@ -55,7 +58,7 @@ impl FromRequest for JwtMiddleware {
 
         let access_token_details = match verify_jwt_token(
             data.secrets.access_token_public_key.to_owned(),
-            &access_token.unwrap(),
+            &bearer_token.unwrap(),
         ) {
             Ok(token_details) => token_details,
             Err(e) => {

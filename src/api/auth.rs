@@ -118,18 +118,6 @@ pub async fn login(
         return Err(CustomError::HttpError(CustomHttpError::RedisProblem));
     }
 
-    let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
-        .path("/")
-        .max_age(ActixWebDuration::seconds(
-            data.secrets.access_token_max_age * 60,
-        ))
-        .http_only(true)
-        .domain(data.secrets.domain.clone())
-        .same_site(actix_web::cookie::SameSite::None)
-        //just use secure in production
-        .secure(cfg!(not(debug_assertions)))
-        .finish();
-
     let refresh_cookie = Cookie::build(
         "refresh_token",
         refresh_token_details.token.clone().unwrap(),
@@ -144,21 +132,9 @@ pub async fn login(
     .same_site(actix_web::cookie::SameSite::None)
     .finish();
 
-    let logged_in_cookie = Cookie::build("logged_in", "true")
-        .path("/")
-        .max_age(ActixWebDuration::seconds(
-            data.secrets.access_token_max_age * 60,
-        ))
-        .http_only(false)
-        .domain(data.secrets.domain.clone())
-        .secure(false)
-        .finish();
-
     Ok(HttpResponse::Ok()
-        .cookie(access_cookie)
         .cookie(refresh_cookie)
-        .cookie(logged_in_cookie)
-        .json(serde_json::json!({"status": "success"})))
+        .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()})))
 }
 
 #[post("/auth/register")]
@@ -288,32 +264,7 @@ async fn refresh_access_token(
         return Err(CustomError::HttpError(CustomHttpError::RedisProblem));
     }
 
-    let access_cookie = Cookie::build("access_token", access_token_details.token.clone().unwrap())
-        .path("/")
-        .max_age(ActixWebDuration::new(
-            data.secrets.access_token_max_age * 60,
-            0,
-        ))
-        .http_only(true)
-        .domain(data.secrets.domain.clone())
-        .same_site(actix_web::cookie::SameSite::None)
-        .secure(cfg!(not(debug_assertions)))
-        .finish();
-
-    let logged_in_cookie = Cookie::build("logged_in", "true")
-        .path("/")
-        .max_age(ActixWebDuration::new(
-            data.secrets.access_token_max_age * 60,
-            0,
-        ))
-        .http_only(false)
-        .domain(data.secrets.domain.clone())
-        .secure(cfg!(not(debug_assertions)))
-        .finish();
-
     Ok(HttpResponse::Ok()
-    .cookie(access_cookie)
-    .cookie(logged_in_cookie)
     .json(serde_json::json!({"status": "success", "access_token": access_token_details.token.unwrap()})))
 }
 
@@ -370,29 +321,6 @@ async fn logout(
         }
         Err(err) => Err(CustomError::RedisError(err)),
     }
-}
-
-#[get("/session_status")]
-async fn session_status(
-    req: HttpRequest,
-    data: web::Data<AppState>,
-) -> Result<HttpResponse, CustomError> {
-    let refresh_token = req.cookie("refresh_token").map(|c| c.value().to_string());
-    let access_token = req.cookie("access_token").map(|c| c.value().to_string());
-
-    if let Some(token) = access_token {
-        if verify_jwt_token(data.secrets.access_token_public_key.clone(), &token).is_ok() {
-            return Ok(HttpResponse::Ok().json(json!({ "status": "access" })));
-        }
-    }
-
-    if let Some(refresh) = refresh_token {
-        if verify_jwt_token(data.secrets.refresh_token_public_key.clone(), &refresh).is_ok() {
-            return Ok(HttpResponse::Ok().json(json!({ "status": "refresh" })));
-        }
-    }
-
-    Ok(HttpResponse::Unauthorized().json(json!({ "status": "login" })))
 }
 
 #[get("/users/me")]
