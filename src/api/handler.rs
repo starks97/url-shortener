@@ -24,6 +24,7 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_env:
         .max_age(3600);
 
     let scope = web::scope("/api")
+        .wrap(cors)
         .service(health_checker)
         .service(create_url)
         .service(delete_url)
@@ -36,8 +37,7 @@ pub fn config_handler(config: &mut web::ServiceConfig, config_data: &config_env:
         .service(login)
         .service(logout)
         .service(refresh_access_token)
-        .service(session_status)
-        .wrap(cors);
+        .service(session_status);
 
     config.service(scope);
 }
